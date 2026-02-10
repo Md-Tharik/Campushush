@@ -1,0 +1,8 @@
+{
+  "name": "campus-hush-bot",
+  "version": "1.0.0",
+  "main": "daily-push.js",
+  "dependencies": {
+    "firebase-admin": "^11.11.0"
+  }
+}
