@@ -196,18 +196,23 @@
 </head>
 <body>
 
-    <header class="app-header">
+       <header class="app-header">
         <div class="header-left">
             <div class="back-btn" id="back-btn" onclick="goHome()"><i class="fas fa-arrow-left"></i></div>
             <div class="logo" id="logo-text">Campus Hush 🤫</div>
             <div class="channel-title" id="channel-title">Channel</div>
         </div>
         <div class="header-right">
-            <button class="btn-sm btn-bell" id="notif-btn" onclick="enableNotifications()"><i class="fas fa-bell"></i></button>
+            <button class="btn-sm btn-bell" id="notif-btn" onclick="toggleNotifications()">
+                <i class="fas fa-bell-slash"></i>
+            </button>
+            
             <button class="btn-sm btn-support" onclick="donateMoney()">❤️ Support</button>
+            
             <button class="btn-sm btn-login" id="auth-btn" onclick="handleAuth()">Login</button>
         </div>
     </header>
+
 
     <div class="lobby-container" id="lobby-view">
         <h2 style="text-align:center; color:#1E293B; margin-bottom:10px;">Select a Zone</h2>
@@ -309,19 +314,19 @@
 
     <div id="toast"></div>
 
-    <script src="config.js"></script> 
+        <script src="config.js"></script> 
     <script>
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         const auth = firebase.auth();
-        // NOTIFICATION MESSAGING (NEW)
-        const messaging = firebase.messaging();
+        const messaging = firebase.messaging(); // Added for notifications
         
         let currentUser = null;
         let userProfile = null;
         let currentTab = null;
         let isGold = false;
         let feedListener = null;
+        let isSubscribed = false; // Track notification status
 
         // --- AUTH ---
         auth.onAuthStateChanged(async (user) => {
@@ -333,34 +338,81 @@
                     document.getElementById('modal-profile').style.display = 'flex';
                 } else {
                     userProfile = doc.data();
+                    
+                    // --- NEW LOGIC: Check Subscription ---
+                    if(userProfile.fcmToken) {
+                        isSubscribed = true;
+                    } else {
+                        isSubscribed = false;
+                    }
+                    updateBellIcon();
+                    // -------------------------------------
+
                     if (!sessionStorage.getItem('rulesAgreed')) document.getElementById('modal-rules').style.display = 'flex';
                 }
                 document.getElementById('modal-login').style.display = 'none';
             } else {
                 document.getElementById('auth-btn').innerText = "Login";
                 userProfile = null;
+                // Reset Icon on Logout
+                isSubscribed = false;
+                updateBellIcon();
             }
             updateInputState();
         });
 
-        // --- NOTIFICATIONS LOGIC (NEW) ---
-        function enableNotifications() {
-            if(!("Notification" in window)) return showToast("Not supported on this browser");
-            Notification.requestPermission().then(permission => {
-                if(permission === 'granted') {
-                    showToast("Allowed! Getting Token...");
-                    messaging.getToken({ vapidKey: "" }).then((token) => {
-                        if (token && currentUser) {
-                            // Save Token to User Profile
-                            db.collection('users').doc(currentUser.uid).update({ fcmToken: token });
-                            showToast("You will be notified! 🔔");
-                        }
-                    }).catch(e => console.log(e));
-                } else {
-                    showToast("Permission Denied");
-                }
-            });
+        // --- NEW: TOGGLE NOTIFICATIONS ---
+        function toggleNotifications() {
+            if(!currentUser) return showToast("Please Login first");
+
+            if(isSubscribed) {
+                // Turn OFF
+                db.collection('users').doc(currentUser.uid).update({
+                    fcmToken: firebase.firestore.FieldValue.delete()
+                }).then(() => {
+                    isSubscribed = false;
+                    updateBellIcon();
+                    showToast("Notifications Muted 🔕");
+                }).catch(err => console.log(err));
+            } else {
+                // Turn ON
+                if(!("Notification" in window)) return showToast("Not supported");
+                
+                Notification.requestPermission().then(permission => {
+                    if(permission === 'granted') {
+                        messaging.getToken({ vapidKey: "" }).then((token) => {
+                            if (token) {
+                                db.collection('users').doc(currentUser.uid).update({ fcmToken: token });
+                                isSubscribed = true;
+                                updateBellIcon();
+                                showToast("Notifications Active! 🔔");
+                            }
+                        }).catch(e => console.log(e));
+                    } else {
+                        showToast("Permission Denied via Settings");
+                    }
+                });
+            }
         }
+
+        // --- NEW: UPDATE ICON UI ---
+        function updateBellIcon() {
+            const btn = document.getElementById('notif-btn');
+            // Safety check in case button is missing
+            if(!btn) return; 
+
+            if(isSubscribed) {
+                // Active (Blue)
+                btn.innerHTML = '<i class="fas fa-bell" style="color:#4F46E5;"></i>';
+                btn.style.background = "#EEF2FF";
+            } else {
+                // Inactive (Gray)
+                btn.innerHTML = '<i class="fas fa-bell-slash" style="color:#94A3B8;"></i>';
+                btn.style.background = "#F1F5F9";
+            }
+        }
+
+        // --- ORIGINAL FUNCTIONS BELOW ---
 
         async function saveProfile() {
             const dept = document.getElementById('dept-input').value.trim();
@@ -386,79 +438,6 @@
             showToast("Profile Saved!");
         }
 
-        // --- FEED ---
-        function loadFeed() {
-            const feedDiv = document.getElementById('feed-content');
-            feedDiv.innerHTML = "";
-            document.getElementById('feed-loader').style.display = 'block';
-
-            feedListener = db.collection('messages')
-                .where('category', '==', currentTab)
-                .orderBy('timestamp', 'desc')
-                .limit(30)
-                .onSnapshot(snap => {
-                    document.getElementById('feed-loader').style.display = 'none';
-                    feedDiv.innerHTML = "";
-                    if(snap.empty) {
-                        feedDiv.innerHTML = `<div style="text-align:center;color:#94A3B8;margin-top:20px;">No messages yet.</div>`;
-                    }
-                    
-                    snap.forEach(doc => {
-                        renderMessage(doc.data(), doc.id, feedDiv);
-                    });
-                });
-        }
-
-        function renderMessage(msg, id, container) {
-            const isOwner = currentUser && currentUser.email === ADMIN_EMAIL;
-            const delBtn = isOwner ? `<i class="fas fa-trash" onclick="deleteMsg('${id}')" style="float:right; color:#EF4444; cursor:pointer; margin-left:10px;"></i>` : '';
-            
-            let badges = "";
-            if(msg.isAdmin) badges += `<span class="badge badge-admin">ADMIN</span>`;
-            if(msg.isPremium) badges += `<span class="badge badge-gold">GOLD</span>`;
-
-            // GENDER BOX LOGIC
-            let genderHtml = "";
-            if(!msg.isAdmin) {
-                if(msg.userGender === 'Male') genderHtml = `<span class="gender-box gender-m">M</span>`;
-                else if(msg.userGender === 'Female') genderHtml = `<span class="gender-box gender-f">F</span>`;
-                else genderHtml = `<span class="gender-box gender-h">?</span>`;
-            }
-
-            // DATE FORMATTING
-            let timeStr = "Just now";
-            if(msg.timestamp) {
-                const date = msg.timestamp.toDate();
-                // Format: Feb 10 • 07:09 PM
-                const datePart = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-                const timePart = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                timeStr = `${datePart} • ${timePart}`;
-            }
-
-            const userMeta = msg.isAdmin ? "Announcement" : `${msg.userDept}`;
-            const displayId = msg.isAdmin ? "Admin" : (msg.anonymousId || "Anonymous");
-
-            const html = `
-                <div class="msg-card ${msg.isPremium ? 'premium' : ''} ${currentTab === 'news' ? 'news-card' : ''}">
-                    <div class="msg-header">
-                        <div style="flex-grow:1;">
-                            <div class="user-id">
-                                ${displayId} 
-                                ${genderHtml}
-                                <div class="badges">${badges}</div>
-                                <span class="msg-time">${timeStr}</span>
-                            </div>
-                            <div class="user-details">${userMeta}</div>
-                        </div>
-                        ${delBtn}
-                    </div>
-                    <div class="msg-text">${msg.text}</div>
-                </div>
-            `;
-            container.insertAdjacentHTML('beforeend', html);
-        }
-
-        // --- NAVIGATION ---
         function enterChannel(channelKey, title) {
             currentTab = channelKey;
             
@@ -497,7 +476,74 @@
             document.getElementById('channel-title').style.display = 'none';
         }
 
-        // --- CHAT ---
+        function loadFeed() {
+            const feedDiv = document.getElementById('feed-content');
+            feedDiv.innerHTML = "";
+            document.getElementById('feed-loader').style.display = 'block';
+
+            feedListener = db.collection('messages')
+                .where('category', '==', currentTab)
+                .orderBy('timestamp', 'desc')
+                .limit(30)
+                .onSnapshot(snap => {
+                    document.getElementById('feed-loader').style.display = 'none';
+                    feedDiv.innerHTML = "";
+                    if(snap.empty) {
+                        feedDiv.innerHTML = `<div style="text-align:center;color:#94A3B8;margin-top:20px;">No messages yet.</div>`;
+                    }
+                    
+                    snap.forEach(doc => {
+                        renderMessage(doc.data(), doc.id, feedDiv);
+                    });
+                });
+        }
+
+        function renderMessage(msg, id, container) {
+            const isOwner = currentUser && currentUser.email === ADMIN_EMAIL;
+            const delBtn = isOwner ? `<i class="fas fa-trash" onclick="deleteMsg('${id}')" style="float:right; color:#EF4444; cursor:pointer; margin-left:10px;"></i>` : '';
+            
+            let badges = "";
+            if(msg.isAdmin) badges += `<span class="badge badge-admin">ADMIN</span>`;
+            if(msg.isPremium) badges += `<span class="badge badge-gold">GOLD</span>`;
+
+            let genderHtml = "";
+            if(!msg.isAdmin) {
+                if(msg.userGender === 'Male') genderHtml = `<span class="gender-box gender-m">M</span>`;
+                else if(msg.userGender === 'Female') genderHtml = `<span class="gender-box gender-f">F</span>`;
+                else genderHtml = `<span class="gender-box gender-h">?</span>`;
+            }
+
+            let timeStr = "Just now";
+            if(msg.timestamp) {
+                const date = msg.timestamp.toDate();
+                const datePart = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                const timePart = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                timeStr = `${datePart} • ${timePart}`;
+            }
+
+            const userMeta = msg.isAdmin ? "Announcement" : `${msg.userDept}`;
+            const displayId = msg.isAdmin ? "Admin" : (msg.anonymousId || "Anonymous");
+
+            const html = `
+                <div class="msg-card ${msg.isPremium ? 'premium' : ''} ${currentTab === 'news' ? 'news-card' : ''}">
+                    <div class="msg-header">
+                        <div style="flex-grow:1;">
+                            <div class="user-id">
+                                ${displayId} 
+                                ${genderHtml}
+                                <div class="badges">${badges}</div>
+                                <span class="msg-time">${timeStr}</span>
+                            </div>
+                            <div class="user-details">${userMeta}</div>
+                        </div>
+                        ${delBtn}
+                    </div>
+                    <div class="msg-text">${msg.text}</div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', html);
+        }
+
         function updateInputState() {
             const input = document.getElementById('chat-input');
             if(!currentUser) {
@@ -544,7 +590,6 @@
             }
         }
 
-        // --- UTILS ---
         function handleAuth() { currentUser ? auth.signOut() : document.getElementById('modal-login').style.display='flex'; }
         function googleLogin() { auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
         function acceptRules() { sessionStorage.setItem('rulesAgreed', 'true'); document.getElementById('modal-rules').style.display='none'; }
@@ -556,5 +601,7 @@
             new Razorpay({ "key": RAZORPAY_KEY, "amount": amt*100, "currency": "INR", "name": "Campus Hush", "handler": cb, "theme": {"color": "#0F172A"} }).open();
         }
     </script>
+
+
 </body>
 </html>
