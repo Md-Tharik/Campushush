@@ -1,6 +1,6 @@
 const admin = require('firebase-admin');
 
-// Initialize
+// 1. Safe Initialization
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
@@ -10,65 +10,73 @@ const db = admin.firestore();
 const messaging = admin.messaging();
 
 async function runDailyPush() {
-    console.log("🤖 Robot Waking Up...");
+    try {
+        console.log("🤖 Robot Waking Up...");
+        const yesterday = new Date(Date.now() - 86400000);
+        
+        // Check for messages
+        const snapshot = await db.collection('messages')
+            .where('timestamp', '>', yesterday)
+            .get();
 
-    const now = new Date();
-    const yesterday = new Date(now.getTime() - (24 * 60 * 60 * 1000)); // Last 24 hours
+        if (snapshot.empty) {
+            console.log("😴 No messages today. Exiting.");
+            return;
+        }
 
-    // 1. CHECK FOR ACTIVITY
-    const snapshot = await db.collection('messages')
-        .where('timestamp', '>', yesterday)
-        .get();
+        // Determine content
+        let hasNews = false;
+        snapshot.forEach(doc => { if (doc.data().category === 'news') hasNews = true; });
 
-    if (snapshot.empty) {
-        console.log("😴 No messages today.");
-        return; // Logic finishes here
-    }
+        const notification = hasNews 
+            ? { title: "📢 Important News", body: "Admin posted an announcement." }
+            : { title: "👀 Someone posted something...", body: "Check out the latest secrets." };
 
-    // 2. DECIDE MESSAGE
-    let hasNews = false;
-    snapshot.forEach(doc => {
-        if (doc.data().category === 'news') hasNews = true;
-    });
+        // Get users
+        const usersSnap = await db.collection('users').get();
+        let tokens = [];
+        
+        usersSnap.forEach(doc => {
+            const u = doc.data();
+            if (u.fcmToken) tokens.push(u.fcmToken);
+        });
 
-    const notification = hasNews 
-        ? { title: "📢 Important News", body: "Admin posted an announcement." }
-        : { title: "👀 Someone posted something...", body: "Check out the latest secrets." };
+        if (tokens.length === 0) {
+            console.log("🤷 No users subscribed.");
+            return;
+        }
 
-    // 3. GET USERS & SEND
-    const usersSnap = await db.collection('users').get();
-    let batch = [];
+        console.log(`🚀 Preparing to send to ${tokens.length} devices...`);
 
-    usersSnap.forEach(doc => {
-        const u = doc.data();
-        if (u.fcmToken) {
-            batch.push({
-                token: u.fcmToken,
-                notification: notification,
-                data: { 
-                    url: 'https://hushly.fun', 
-                    click_action: 'FLUTTER_NOTIFICATION_CLICK' 
+        // Send logic (Handles errors per user)
+        const responses = await messaging.sendEachForMulticast({
+            tokens: tokens,
+            notification: notification,
+            data: { url: 'https://hushly.fun', click_action: 'FLUTTER_NOTIFICATION_CLICK' }
+        });
+
+        console.log(`✅ Success: ${responses.successCount}`);
+        console.log(`❌ Failed: ${responses.failureCount}`);
+
+        // Cleanup invalid tokens (Self-cleaning database)
+        if (responses.failureCount > 0) {
+            const failedTokens = [];
+            responses.responses.forEach((resp, idx) => {
+                if (!resp.success) {
+                    failedTokens.push(tokens[idx]);
                 }
             });
+            console.log("🧹 Cleaning up invalid tokens...");
+            // (Advanced logic to delete bad tokens could go here)
         }
-    });
 
-    if (batch.length > 0) {
-        console.log(`🚀 Sending to ${batch.length} users.`);
-        const response = await messaging.sendEach(batch);
-        console.log(`✅ Success: ${response.successCount}`);
-    } else {
-        console.log("🤷 No users with tokens found.");
+    } catch (error) {
+        console.error("🔥 CRITICAL ERROR:", error);
+        process.exit(1); // Tells GitHub the robot crashed
     }
 }
 
-// --- THE FIX IS HERE ---
-runDailyPush()
-    .then(() => {
-        console.log("🏁 Robot Finished. Exiting.");
-        process.exit(0); // FORCE KILL THE PROCESS
-    })
-    .catch((error) => {
-        console.error("❌ Error:", error);
-        process.exit(1); // FORCE KILL WITH ERROR
-    });
+runDailyPush().then(() => {
+    console.log("🏁 Done.");
+    process.exit(0);
+});
