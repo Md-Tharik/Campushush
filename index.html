@@ -5,14 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SRASC | Campus Hush</title>
     
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="apple-touch-icon" href="logo.png">
     <link rel="manifest" href="manifest.json">
 
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="icon" type="image/png" href="image.png">
-    <link rel="icon" type="image/png" href="logo.png">
-
-<link rel="apple-touch-icon" href="logo.png">
     
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
@@ -64,7 +62,7 @@
         .btn-support { background: #FEE2E2; color: #DC2626; }
         .btn-login { background: #0F172A; color: white; }
         
-        /* BELL BUTTON (NEW) */
+        /* BELL BUTTON */
         .btn-bell { background: #EFF6FF; color: #3B82F6; font-size: 1rem; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
 
         /* --- 2. LOBBY --- */
@@ -72,8 +70,50 @@
             padding: 20px; max-width: 500px; margin: 0 auto;
             display: flex; flex-direction: column; gap: 15px;
             min-height: 80vh; justify-content: center;
+            position: relative; /* Context for absolute positioning if needed */
         }
 
+        /* --- NEW: STICKY INSTALL BUTTON CSS --- */
+        #install-container {
+            position: fixed;
+            bottom: 30px;
+            left: 0;
+            width: 100%;
+            display: none; /* Hidden by default, toggled by JS */
+            justify-content: center;
+            z-index: 1000;
+            pointer-events: none; /* Let clicks pass through the empty container space */
+            padding: 0 20px;
+            animation: slideUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .btn-install {
+            pointer-events: auto; /* Re-enable clicks on the button itself */
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 14px 28px;
+            border-radius: 50px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        .btn-install:active { transform: scale(0.95); background: #0F172A; }
+
+        @keyframes slideUp {
+            from { transform: translateY(100px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* --- CHANNELS --- */
         .channel-block {
             background: white; padding: 25px; border-radius: 20px;
             box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
@@ -200,7 +240,7 @@
 </head>
 <body>
 
-       <header class="app-header">
+    <header class="app-header">
         <div class="header-left">
             <div class="back-btn" id="back-btn" onclick="goHome()"><i class="fas fa-arrow-left"></i></div>
             <div class="logo" id="logo-text">Campus Hush 🤫</div>
@@ -219,6 +259,14 @@
 
 
     <div class="lobby-container" id="lobby-view">
+        
+        <div id="install-container">
+            <button onclick="installApp()" class="btn-install">
+                <i class="fas fa-download" style="color:#818CF8;"></i> 
+                Install App
+            </button>
+        </div>
+
         <h2 style="text-align:center; color:#1E293B; margin-bottom:10px;">Select a Zone</h2>
         
         <div class="channel-block c-chat" onclick="enterChannel('chitchat', '💬 Chit Chat')">
@@ -318,19 +366,19 @@
 
     <div id="toast"></div>
 
-        <script src="config.js"></script> 
+    <script src="config.js"></script> 
     <script>
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         const auth = firebase.auth();
-        const messaging = firebase.messaging(); // Added for notifications
+        const messaging = firebase.messaging(); 
         
         let currentUser = null;
         let userProfile = null;
         let currentTab = null;
         let isGold = false;
         let feedListener = null;
-        let isSubscribed = false; // Track notification status
+        let isSubscribed = false; 
 
         // --- AUTH ---
         auth.onAuthStateChanged(async (user) => {
@@ -343,14 +391,12 @@
                 } else {
                     userProfile = doc.data();
                     
-                    // --- NEW LOGIC: Check Subscription ---
                     if(userProfile.fcmToken) {
                         isSubscribed = true;
                     } else {
                         isSubscribed = false;
                     }
                     updateBellIcon();
-                    // -------------------------------------
 
                     if (!sessionStorage.getItem('rulesAgreed')) document.getElementById('modal-rules').style.display = 'flex';
                 }
@@ -358,19 +404,17 @@
             } else {
                 document.getElementById('auth-btn').innerText = "Login";
                 userProfile = null;
-                // Reset Icon on Logout
                 isSubscribed = false;
                 updateBellIcon();
             }
             updateInputState();
         });
 
-        // --- NEW: TOGGLE NOTIFICATIONS ---
+        // --- TOGGLE NOTIFICATIONS ---
         function toggleNotifications() {
             if(!currentUser) return showToast("Please Login first");
 
             if(isSubscribed) {
-                // Turn OFF
                 db.collection('users').doc(currentUser.uid).update({
                     fcmToken: firebase.firestore.FieldValue.delete()
                 }).then(() => {
@@ -379,7 +423,6 @@
                     showToast("Notifications Muted 🔕");
                 }).catch(err => console.log(err));
             } else {
-                // Turn ON
                 if(!("Notification" in window)) return showToast("Not supported");
                 
                 Notification.requestPermission().then(permission => {
@@ -399,25 +442,20 @@
             }
         }
 
-        // --- NEW: UPDATE ICON UI ---
         function updateBellIcon() {
             const btn = document.getElementById('notif-btn');
-            // Safety check in case button is missing
             if(!btn) return; 
 
             if(isSubscribed) {
-                // Active (Blue)
                 btn.innerHTML = '<i class="fas fa-bell" style="color:#4F46E5;"></i>';
                 btn.style.background = "#EEF2FF";
             } else {
-                // Inactive (Gray)
                 btn.innerHTML = '<i class="fas fa-bell-slash" style="color:#94A3B8;"></i>';
                 btn.style.background = "#F1F5F9";
             }
         }
 
-        // --- ORIGINAL FUNCTIONS BELOW ---
-
+        // --- APP LOGIC ---
         async function saveProfile() {
             const dept = document.getElementById('dept-input').value.trim();
             const gender = document.getElementById('gender-select').value;
@@ -604,8 +642,33 @@
             if (typeof Razorpay === 'undefined') return showToast("Loading payment...");
             new Razorpay({ "key": RAZORPAY_KEY, "amount": amt*100, "currency": "INR", "name": "Campus Hush", "handler": cb, "theme": {"color": "#0F172A"} }).open();
         }
+
+        // --- NEW: INSTALL APP LOGIC ---
+        let deferredPrompt;
+        const installContainer = document.getElementById('install-container');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            // Use 'flex' to keep the button centered properly
+            installContainer.style.display = 'flex'; 
+        });
+
+        async function installApp() {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`User response to install prompt: ${outcome}`);
+            deferredPrompt = null;
+            if(outcome === 'accepted') {
+                installContainer.style.display = 'none';
+            }
+        }
+
+        window.addEventListener('appinstalled', () => {
+            installContainer.style.display = 'none';
+            deferredPrompt = null;
+        });
     </script>
-
-
 </body>
 </html>
