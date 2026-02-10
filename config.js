@@ -12,4 +12,4 @@ const firebaseConfig = {
 const ADMIN_EMAIL = "tharikm421azaz@gmail.com"; 
 
 // Razorpay Key (Optional - Leave as is for testing)
-const RAZORPAY_KEY = "rzp_live_SEWToMaVY9wv59"; 
+const RAZORPAY_KEY = "rzp_test_SEZ1tQeGbrCpRv"; 
