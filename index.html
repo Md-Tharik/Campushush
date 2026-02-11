@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SRASC | Campus Hush</title>
+    
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="apple-touch-icon" href="logo.png">
+    <link rel="manifest" href="manifest.json">
+
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-messaging-compat.js"></script>
+
+    <style>
+        :root { 
+            --bg: #F1F5F9; 
+            --text-main: #0F172A; 
+            --primary: #4F46E5;
+            --white: #ffffff;
+            --gold-grad: linear-gradient(135deg, #FFD700, #FDB931);
+        }
+        
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body { 
+            background: var(--bg); color: var(--text-main); 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            margin: 0; padding-bottom: 0; 
+            overscroll-behavior-y: none;
+        }
+
+        /* --- 1. HEADER --- */
+        .app-header {
+            background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
+            position: sticky; top: 0; z-index: 50;
+            border-bottom: 1px solid #E2E8F0;
+            padding: 12px 16px;
+            display: flex; justify-content: space-between; align-items: center;
+            height: 60px;
+        }
+        
+        .header-left { display: flex; align-items: center; gap: 10px; }
+        
+        .back-btn {
+            font-size: 1.2rem; color: #64748B; cursor: pointer;
+            padding: 8px; border-radius: 50%; display: none; 
+        }
+        .back-btn:active { background: #F1F5F9; }
+
+        .logo { font-weight: 800; font-size: 1.2rem; color: var(--primary); }
+        .channel-title { font-weight: 800; font-size: 1.1rem; color: #1E293B; display: none; }
+
+        .header-right { display: flex; gap: 8px; }
+        .btn-sm { padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; border: none; cursor: pointer; }
+        .btn-support { background: #FEE2E2; color: #DC2626; }
+        .btn-login { background: #0F172A; color: white; }
+        
+        /* Filter Button */
+        .btn-filter { background: #EEF2FF; color: #4F46E5; display:none; }
+        .btn-filter.active { background: #FEF3C7; color: #D97706; }
+
+        /* Admin Button - Hidden by default */
+        .btn-admin { background: #1E293B; color: #F59E0B; display: none; }
+
+        .btn-bell { background: #EFF6FF; color: #3B82F6; font-size: 1rem; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+
+        /* --- 2. LOBBY --- */
+        .lobby-container {
+            padding: 20px; max-width: 500px; margin: 0 auto;
+            display: flex; flex-direction: column; gap: 15px;
+            min-height: 80vh; 
+            position: relative; 
+            padding-top: 10px;
+        }
+
+        /* SECTION HEADERS */
+        .section-header {
+            font-size: 0.85rem; font-weight: 800; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px;
+            margin-top: 15px; margin-bottom: 5px; padding-left: 5px;
+        }
+
+        /* --- CHANNELS --- */
+        .channel-block {
+            background: white; padding: 25px; border-radius: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            cursor: pointer; transition: 0.2s; border: 2px solid transparent;
+            display: flex; align-items: center; gap: 15px;
+        }
+        .channel-block:active { transform: scale(0.98); }
+        
+        .block-icon {
+            width: 50px; height: 50px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem;
+        }
+        .block-info h3 { margin: 0; font-size: 1.1rem; color: #1E293B; }
+        .block-info p { margin: 2px 0 0; font-size: 0.8rem; color: #64748B; }
+
+        /* Zone Colors */
+        .c-contest .block-icon { background: linear-gradient(135deg, #10B981, #059669); color: white; }
+        .c-deals .block-icon { background: #FFF7ED; color: #EA580C; }
+        .c-chat .block-icon { background: #EEF2FF; color: #4F46E5; }
+        .c-rant .block-icon { background: #FEF2F2; color: #DC2626; }
+        .c-help .block-icon { background: #F0F9FF; color: #0284C7; }
+        .c-news .block-icon { background: #ECFDF5; color: #059669; }
+
+        /* --- VIEWS --- */
+        .contest-view, .deals-view, .admin-view { display: none; padding: 20px; max-width: 600px; margin: 0 auto; }
+        
+        /* ADMIN PANEL STYLES */
+        .admin-table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; font-size: 0.8rem; }
+        .admin-table th, .admin-table td { padding: 10px; text-align: left; border-bottom: 1px solid #E2E8F0; }
+        .admin-table th { background: #F1F5F9; font-weight: 800; color: #475569; }
+        .row-red { background: #FEE2E2 !important; } /* Cheater Color */
+        .row-green { background: #F0FDF4 !important; } /* Good User Color */
+        .tag { padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem; }
+        .tag-dup { background: #EF4444; color: white; }
+
+        .contest-card {
+            background: linear-gradient(135deg, #10B981, #059669);
+            color: white; padding: 25px; border-radius: 20px;
+            text-align: center; margin-bottom: 20px;
+            box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+        }
+        .contest-stat { background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; margin: 15px 0; }
+        
+        .rank-table { width: 100%; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .rank-row { display: flex; justify-content: space-between; padding: 15px; border-bottom: 1px solid #F1F5F9; font-size: 0.95rem; }
+        .rank-num { font-weight: 800; width: 30px; color: #64748B; }
+        .rank-1 { color: #D97706; } .rank-2 { color: #4B5563; } .rank-3 { color: #B45309; }
+
+        /* --- ADS --- */
+        .ad-container {
+            margin: 0 0 15px 0; width: 100%; border-radius: 12px;
+            overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            background: white; display: block; text-decoration: none;
+        }
+        .ad-container img { width: 100%; height: auto; display: block; max-height: 150px; object-fit: cover;}
+        .ad-label { font-size: 0.6rem; color: #94A3B8; text-align: right; padding: 2px 8px; background: #F8FAFC; }
+
+        /* --- FEED --- */
+        .feed-container { 
+            display: none; max-width: 600px; margin: 0 auto; padding: 15px; 
+            padding-bottom: 140px; 
+        }
+        
+        .msg-card {
+            background: white; border-radius: 16px; padding: 16px; margin-bottom: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03); position: relative;
+            transition: background 0.5s;
+        }
+        /* Highlight animation for reply jump */
+        .highlight-msg { animation: highlightAnim 2s ease; }
+        @keyframes highlightAnim { 
+            0% { background: #EEF2FF; transform: scale(1.02); } 
+            100% { background: white; transform: scale(1); } 
+        }
+
+        .msg-card.pinned-card { border: 2px solid #F59E0B; background: #FFFBEB; order: -1; }
+        .msg-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .user-id { font-weight: 800; font-size: 0.95rem; color: #1E293B; display: flex; align-items: center; gap: 6px; }
+
+        /* Reply Preview inside Message */
+        .reply-preview {
+            background: #F1F5F9; border-left: 4px solid #6366F1;
+            padding: 8px; margin-bottom: 8px; border-radius: 4px;
+            font-size: 0.8rem; color: #475569; cursor: pointer;
+        }
+        .reply-preview:active { opacity: 0.7; }
+
+        .msg-actions {
+            display: flex; justify-content: flex-end; align-items: center; gap: 15px;
+            margin-top: 10px; padding-top: 10px; border-top: 1px solid #F1F5F9;
+        }
+        .action-btn {
+            background: none; border: none; font-size: 0.9rem; font-weight: 600;
+            color: #94A3B8; cursor: pointer; display: flex; align-items: center; gap: 5px;
+        }
+        .action-btn.upvoted { color: #EF4444; }
+        
+        .gender-box { font-size: 0.65rem; font-weight: 800; color: white; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-left: 6px; }
+        .gender-m { background: #3B82F6; } .gender-f { background: #EC4899; } .gender-h { background: #94A3B8; }
+        .badge { font-size: 0.6rem; padding: 2px 6px; border-radius: 4px; font-weight: 800; margin-left:5px; }
+        .badge-admin { background: #DBEAFE; color: #2563EB; } .badge-gold { background: #FFD700; color: #451a03; border: 1px solid #B45309; }
+        .msg-time { margin-left: auto; font-size: 0.7rem; color: #94A3B8; font-weight: 500; }
+        .msg-text { font-size: 1rem; line-height: 1.5; color: #334155; white-space: pre-wrap; word-break: break-word; }
+        .msg-text a { color: #4F46E5; text-decoration: underline; font-weight: 600; }
+        .msg-card.premium { background: linear-gradient(135deg, #FFFBEB, #FFFFFF); border: 2px solid #FCD34D; box-shadow: 0 0 15px rgba(251, 191, 36, 0.3); }
+
+        /* --- 4. CHAT BAR --- */
+        .chat-bar {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background: white; padding: 10px 16px;
+            border-top: 1px solid #E2E8F0;
+            display: none; flex-direction: column; z-index: 100;
+        }
+        #reply-context {
+            background: #F1F5F9; border-left: 4px solid #6366F1;
+            padding: 8px 12px; font-size: 0.85rem; color: #475569;
+            margin-bottom: 8px; border-radius: 4px; display: none;
+            justify-content: space-between; align-items: center;
+        }
+        .input-row { display: flex; align-items: center; gap: 10px; width: 100%; }
+        .input-wrapper { flex-grow: 1; background: #F1F5F9; border-radius: 24px; display: flex; align-items: center; padding: 0 5px 0 15px; }
+        #chat-input { width: 100%; border: none; background: transparent; padding: 12px 0; font-size: 1rem; outline: none; }
+        .btn-gold { background: transparent; border: none; font-size: 1.2rem; cursor: pointer; padding: 8px; border-radius: 50%; color: #CBD5E1; transition: 0.3s; }
+        .btn-gold.active { color: #F59E0B; text-shadow: 0 0 10px #FCD34D; transform: scale(1.1); }
+        .send-btn { background: var(--primary); color: white; border: none; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; flex-shrink: 0; box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3); }
+
+        #install-container {
+            position: fixed; bottom: 30px; left: 0; width: 100%;
+            display: none; justify-content: center; z-index: 1000;
+            pointer-events: none; padding: 0 20px;
+            animation: slideUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .btn-install {
+            pointer-events: auto; background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(12px); color: white; border: 1px solid rgba(255,255,255,0.1);
+            padding: 14px 28px; border-radius: 50px; font-weight: 700;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 10px; cursor: pointer;
+        }
+        @keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* MODALS */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.9); z-index: 2000; display: none; justify-content: center; align-items: center; padding: 20px; }
+        .modal { background: white; width: 100%; max-width: 360px; padding: 25px; border-radius: 20px; text-align: center; }
+        .modal-btn { width: 100%; padding: 14px; background: #0F172A; color: white; border: none; border-radius: 12px; font-weight: 700; font-size: 1rem; margin-top:10px; }
+        .modal-btn-red { width: 100%; padding: 14px; background: #DC2626; color: white; border: none; border-radius: 12px; font-weight: 700; font-size: 1rem; }
+        input[type="text"], select { width: 100%; padding: 12px; border: 2px solid #E2E8F0; border-radius: 10px; margin-bottom: 15px; background: #F8FAFC; outline: none; }
+        
+        #toast { visibility: hidden; background: #0F172A; color: white; padding: 12px 24px; border-radius: 50px; position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 3000; font-size: 0.9rem; font-weight: 600; opacity: 0; transition: 0.3s; }
+        #toast.show { visibility: visible; opacity: 1; bottom: 90px; }
+
+        .footer-container { text-align: center; margin-top: 45px; padding-top: 30px; padding-bottom: 40px; border-top: 1px solid #E2E8F0; }
+        .dev-credit { color: #94A3B8; font-size: 0.75rem; margin-bottom: 15px; }
+        .dev-credit a { color: #6366F1; text-decoration: none; font-weight: bold; }
+        .legal-links a { color: #64748B; text-decoration: none; margin: 0 5px; font-size: 0.8rem; }
+                /* --- MEDIA QUERIES (RESPONSIVENESS) --- */
+        
+        /* Small Phones (iPhone SE, older Androids) */
+        @media screen and (max-width: 380px) {
+            /* Shrink text and padding */
+            body { font-size: 14px; }
+            .app-header { padding: 10px 12px; }
+            .logo { font-size: 1rem; }
+            
+            /* Compact Channel Blocks */
+            .channel-block { padding: 15px; gap: 10px; }
+            .block-icon { width: 40px; height: 40px; font-size: 1.2rem; }
+            .block-info h3 { font-size: 0.95rem; }
+            .block-info p { font-size: 0.75rem; }
+            
+            /* Compact Buttons */
+            .btn-sm { padding: 4px 8px; font-size: 0.7rem; }
+            .btn-install { padding: 10px 20px; font-size: 0.9rem; }
+            
+            /* Adjust Modal */
+            .modal { width: 90%; padding: 20px; }
+        }
+
+        /* Adjust Admin Table for Mobile */
+        @media screen and (max-width: 600px) {
+            .admin-view { padding: 10px; overflow-x: auto; } /* Horizontal Scroll */
+            .admin-table th, .admin-table td { padding: 8px 5px; font-size: 0.75rem; }
+            
+            /* Truncate long IDs on mobile */
+            .admin-table td:nth-child(3), 
+            .admin-table td:nth-child(4) { 
+                max-width: 80px; 
+                white-space: nowrap; 
+                overflow: hidden; 
+                text-overflow: ellipsis; 
+            }
+        }
+
+        /* Fix Chat Bar on small screens */
+        @media screen and (max-width: 360px) {
+            .chat-bar { padding: 8px; }
+            .send-btn { width: 40px; height: 40px; font-size: 1rem; }
+            #chat-input { font-size: 0.9rem; }
+        }
+
+        /* Short Screens (Landscape or small phones) */
+        @media screen and (max-height: 600px) {
+            .feed-container { padding-bottom: 100px; }
+            #install-container { bottom: 15px; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <header class="app-header">
+        <div class="header-left">
+            <div class="back-btn" id="back-btn" onclick="goHome()"><i class="fas fa-arrow-left"></i></div>
+            <div class="logo" id="logo-text">Campus Hush 🤫</div>
+            <div class="channel-title" id="channel-title">Channel</div>
+        </div>
+        <div class="header-right">
+            <button class="btn-sm btn-admin" id="admin-btn" onclick="openAdminPanel()">🕵️‍♂️ Admin</button>
+            
+            <button class="btn-sm btn-filter" id="filter-btn" onclick="toggleTopFilter()">🔥 Top</button>
+            
+            <button class="btn-sm btn-bell" id="notif-btn" onclick="toggleNotifications()">
+                <i class="fas fa-bell-slash"></i>
+            </button>
+            <button class="btn-sm btn-support" onclick="donateMoney()">❤️ Support</button>
+            <button class="btn-sm btn-login" id="auth-btn" onclick="handleAuth()">Login</button>
+        </div>
+    </header>
+
+    <div class="lobby-container" id="lobby-view">
+        
+        <div id="install-container">
+            <button onclick="installApp()" class="btn-install">
+                <i class="fas fa-download" style="color:#818CF8;"></i> Install App
+            </button>
+        </div>
+
+        <div class="section-header">🏆 Launch Event</div>
+        
+        <div class="channel-block c-contest" onclick="openContest()">
+            <div class="block-icon"><i class="fas fa-trophy"></i></div>
+            <div class="block-info">
+                <h3>Win ₹500 Contest</h3>
+                <p>Limited Time Event!</p>
+            </div>
+            <i class="fas fa-chevron-right" style="margin-left:auto; color:white;"></i>
+        </div>
+
+        <div class="channel-block c-deals" onclick="openDeals()">
+            <div class="block-icon"><i class="fas fa-tag"></i></div>
+            <div class="block-info">
+                <h3>🛍️ Offers & Deals</h3>
+                <p>Student Discounts & Ads</p>
+            </div>
+            <i class="fas fa-chevron-right" style="margin-left:auto; color:#CBD5E1;"></i>
+        </div>
+
+        <div class="section-header" style="margin-top:25px;">💬 Chat Zones</div>
+
+        <div class="channel-block c-chat" onclick="enterChannel('chitchat', '💬')">
+            <div class="block-icon"><i class="fas fa-comments"></i></div>
+            <div class="block-info">
+                <h3>Chit Chat</h3>
+                <p>Casual talks, confessions & fun.</p>
+            </div>
+            <i class="fas fa-chevron-right" style="margin-left:auto; color:#CBD5E1;"></i>
+        </div>
+
+        <div class="channel-block c-rant" onclick="enterChannel('rant', '🗣️')">
+            <div class="block-icon"><i class="fas fa-fire"></i></div>
+            <div class="block-info">
+                <h3>College Rant</h3>
+                <p>Vent your anger anonymously.</p>
+            </div>
+            <i class="fas fa-chevron-right" style="margin-left:auto; color:#CBD5E1;"></i>
+        </div>
+
+        <div class="channel-block c-help" onclick="enterChannel('help', '🤝 ')">
+            <div class="block-icon"><i class="fas fa-hand-holding-heart"></i></div>
+            <div class="block-info">
+                <h3>Helping Hand</h3>
+                <p>Study help & links.</p>
+            </div>
+            <i class="fas fa-chevron-right" style="margin-left:auto; color:#CBD5E1;"></i>
+        </div>
+
+        <div class="channel-block c-news" onclick="enterChannel('news', '📢')">
+            <div class="block-icon"><i class="fas fa-bullhorn"></i></div>
+            <div class="block-info">
+                <h3>Important News</h3>
+                <p>Official updates (Admin Only).</p>
+            </div>
+            <i class="fas fa-chevron-right" style="margin-left:auto; color:#CBD5E1;"></i>
+        </div>
+
+        <div class="footer-container">
+            <div class="dev-credit">
+                &copy; 2026 Campus Hush. Made by 
+                <a href="https://instagram.com/tharik563" target="_blank">Md Tharik</a>
+            </div>
+            <div class="legal-links">
+                <a href="legal.html">Privacy</a> • <a href="legal.html">Terms</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="contest-view" id="contest-view">
+        <div class="contest-card">
+            <h2>🏆 Grand Opening</h2>
+            <p style="margin:5px 0 15px 0; opacity:0.9;">Help us build the community.<br>Top contributors get rewarded.
+</p>
+            
+            <div class="contest-stat">
+                <div style="font-size:0.8rem; opacity:0.8;">YOUR INVITE CODE</div>
+                <div id="contest-my-code" style="font-size:1.5rem; font-weight:800; letter-spacing:2px;">LOADING</div>
+                <div style="font-size:0.9rem; margin-top:5px;">You invited: <span id="contest-my-count" style="font-weight:bold;">0</span></div>
+            </div>
+
+            <button class="btn-sm" style="background:white; color:#059669; border:none; width:100%; padding:12px; font-weight:bold;" onclick="shareReferral()">
+                <i class="fab fa-whatsapp"></i> Share Link
+            </button>
+        </div>
+
+        <h3 style="margin-bottom:10px; color:#334155;">🥇 Top 5 Leaderboard</h3>
+        <div class="rank-table" id="leaderboard-list">
+            <div style="padding:20px; text-align:center; color:#94A3B8;">Loading ranks...</div>
+        </div>
+
+        <div style="margin-top:20px; background:white; padding:15px; border-radius:15px; box-shadow:0 4px 10px rgba(0,0,0,0.05);">
+            <h4 style="margin:0 0 10px 0;">📜 Rules</h4>
+            <ul style="padding-left:20px; color:#64748B; font-size:0.9rem; margin:0;">
+                <li>🏆 Top Inviter wins <b>₹300</b>.</li>
+                <li>🥇 Best Post (Most Likes) wins <b>₹200</b>.</li>
+                <li>⚠️ Spam/Fake invites = Disqualified.</li>
+                <li>⏳ Winners will be announced at 19/02/2026.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="deals-view" id="deals-view">
+        <h2 style="text-align:center; margin-bottom:20px;">🛍️ Student Offers</h2>
+        
+        <a href="#" target="_blank" class="ad-container">
+            <div class="ad-label">Sponsored</div>
+            <img src="#" alt="coming soon">
+        </a>
+
+        <a href="#" class="ad-container">
+            <div class="ad-label">Sponsored</div>
+            <img src="#" alt="coming soon">
+        </a>
+        
+        <p style="text-align:center; color:#94A3B8; font-size:0.8rem;">More deals coming soon...</p>
+    </div>
+
+    <div class="feed-container" id="feed-view">
+        <div id="feed-loader" style="text-align:center; padding:50px; color:#94A3B8;">Loading...</div>
+        <div id="feed-content" style="display:flex; flex-direction:column;"></div>
+    </div>
+
+    <div class="admin-view" id="admin-view">
+        <h2 style="color:#1E293B;">🕵️‍♂️ Detect Cheaters</h2>
+        <p style="color:#64748B;">Red Rows = Same Device or IP (Suspected Fake Accounts)</p>
+        <button class="btn-sm" style="margin-bottom:15px;" onclick="loadAdminData()">🔄 Refresh Data</button>
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Invites</th>
+                    <th>Device ID</th>
+                    <th>IP Address</th>
+                </tr>
+            </thead>
+            <tbody id="admin-table-body">
+                <tr><td colspan="4" style="text-align:center;">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="chat-bar" id="chat-bar">
+        <div id="reply-context">
+            <span>Replying to <b id="reply-to-name">User</b></span>
+            <i class="fas fa-times" onclick="cancelReply()" style="cursor:pointer; padding:5px;"></i>
+        </div>
+        
+        <div class="input-row">
+            <div class="input-wrapper">
+                <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off">
+                <button style="background:none; border:none; color:#F59E0B; margin-right:5px;" onclick="toggleGold()"><i class="fas fa-crown"></i></button>
+            </div>
+            <button class="send-btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+
+    <div id="modal-login" class="modal-overlay">
+        <div class="modal">
+            <h2>Welcome</h2>
+            <p style="color:#64748B; margin-bottom:20px;">Login to join the conversation.</p>
+            <button class="modal-btn" onclick="googleLogin()">Login with Google</button>
+            <button class="modal-btn" style="background:transparent; color:#64748B; margin-top:5px;" onclick="document.getElementById('modal-login').style.display='none'">Cancel</button>
+        </div>
+    </div>
+
+    <div id="modal-profile" class="modal-overlay">
+        <div class="modal">
+            <h2>Setup Profile</h2>
+            <p style="color:#64748B; font-size:0.9rem; margin-bottom:20px;">Required to keep the community safe.</p>
+            <input type="text" id="dept-input" placeholder="Type your Department (e.g. CS, Micro)" maxlength="20">
+            <select id="gender-select">
+                <option value="" disabled selected>Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Hidden">Prefer not to say</option>
+            </select>
+            <div style="margin:10px 0; text-align:left;">
+                <label style="font-size:0.8rem; font-weight:bold; color:#64748B;">Referral Code (Optional):</label>
+                <input type="text" id="refer-input" placeholder="Enter friend's code" style="text-transform:uppercase;">
+            </div>
+            <button class="modal-btn" onclick="saveProfile()">Save & Continue</button>
+        </div>
+    </div>
+
+    <div id="modal-rules" class="modal-overlay">
+        <div class="modal">
+            <h2 style="color:#DC2626;">⚠️ Community Rules</h2>
+            <ul style="text-align:left; color:#475569; margin: 20px 0; padding-left: 20px; line-height:1.6;">
+                <li>🚫 No abusive language.</li>
+                <li>🔞 No NSFW content.</li>
+                <li>🤝 Respect everyone.</li>
+            </ul>
+            <p style="font-size:0.85rem; margin-bottom:20px;">By clicking agree, you accept these terms.</p>
+            <button class="modal-btn-red" onclick="acceptRules()">I Agree & Understand</button>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script src="config.js"></script> 
+    <script>
+        // === SET YOUR ADMIN EMAIL HERE ===
+        // Note: You mentioned adding this to config.js, which is perfect.
+        // =================================
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        const messaging = firebase.messaging();
+        
+        let currentUser = null;
+        let userProfile = null;
+        let currentTab = null;
+        let isGold = false;
+        let feedListener = null;
+        let isSubscribed = false; 
+        let replyData = null; 
+        let isTopFilter = false; 
+
+        // --- AUTH ---
+        auth.onAuthStateChanged(async (user) => {
+            currentUser = user;
+            if(user) {
+                document.getElementById('auth-btn').innerText = "Logout";
+                
+                // Show Admin Button if matched
+                if(typeof ADMIN_EMAIL !== 'undefined' && user.email === ADMIN_EMAIL) {
+                    document.getElementById('admin-btn').style.display = 'block';
+                }
+
+                const doc = await db.collection('users').doc(user.uid).get();
+                
+                if(!doc.exists) {
+                    document.getElementById('modal-profile').style.display = 'flex';
+                } else {
+                    userProfile = doc.data();
+                    
+                    if (!userProfile.myInviteCode) {
+                        const baseName = user.displayName ? user.displayName.replace(/[^a-zA-Z]/g, "").substring(0,3).toUpperCase() : "USR";
+                        const myCode = baseName + Math.floor(100 + Math.random() * 900);
+                        await db.collection('users').doc(user.uid).update({ myInviteCode: myCode });
+                        userProfile.myInviteCode = myCode;
+                    }
+
+                    if(document.getElementById('contest-my-code')) {
+                        document.getElementById('contest-my-code').innerText = userProfile.myInviteCode;
+                        document.getElementById('contest-my-count').innerText = userProfile.inviteCount || 0;
+                    }
+
+                    if(userProfile.fcmToken) isSubscribed = true;
+                    updateBellIcon();
+                    if (!sessionStorage.getItem('rulesAgreed')) document.getElementById('modal-rules').style.display = 'flex';
+                }
+                document.getElementById('modal-login').style.display = 'none';
+            } else {
+                document.getElementById('auth-btn').innerText = "Login";
+                document.getElementById('admin-btn').style.display = 'none';
+                userProfile = null;
+                isSubscribed = false;
+                updateBellIcon();
+            }
+            // CRITICAL FIX: Update input state whenever auth changes
+            updateInputState();
+        });
+
+        // --- NEW: UPDATE INPUT STATE LOGIC ---
+        function updateInputState() {
+            const input = document.getElementById('chat-input');
+            const sendBtn = document.querySelector('.send-btn');
+            if(!input) return;
+
+            if(!currentUser) {
+                input.placeholder = "Please Login to Chat";
+                input.disabled = true;
+                if(sendBtn) sendBtn.style.opacity = "0.5";
+            } else {
+                input.placeholder = "Type a message...";
+                input.disabled = false;
+                if(sendBtn) sendBtn.style.opacity = "1";
+            }
+        }
+
+        // --- ADMIN PANEL LOGIC ---
+        function openAdminPanel() {
+            hideAllViews();
+            document.getElementById('admin-view').style.display = 'block';
+            document.getElementById('channel-title').innerText = "Admin Panel";
+            document.getElementById('channel-title').style.display = 'block';
+            document.getElementById('back-btn').style.display = 'block';
+            document.getElementById('logo-text').style.display = 'none';
+            loadAdminData();
+        }
+
+        async function loadAdminData() {
+            if(!currentUser || currentUser.email !== ADMIN_EMAIL) return showToast("Access Denied");
+            const tbody = document.getElementById('admin-table-body');
+            tbody.innerHTML = "<tr><td colspan='4'>Scanning DB...</td></tr>";
+
+            const snap = await db.collection('users').orderBy('joinedAt', 'desc').limit(50).get();
+            const users = [];
+            const deviceCounts = {};
+            const ipCounts = {};
+
+            snap.forEach(doc => {
+                const d = doc.data();
+                users.push(d);
+                if(d.deviceId) deviceCounts[d.deviceId] = (deviceCounts[d.deviceId] || 0) + 1;
+                if(d.ipAddress) ipCounts[d.ipAddress] = (ipCounts[d.ipAddress] || 0) + 1;
+            });
+
+            tbody.innerHTML = "";
+            users.forEach(u => {
+                const isDeviceDup = deviceCounts[u.deviceId] > 1;
+                const isIpDup = ipCounts[u.ipAddress] > 1;
+                const isSuspect = isDeviceDup || isIpDup;
+                const rowClass = isSuspect ? 'row-red' : 'row-green';
+                
+                const html = `
+                    <tr class="${rowClass}">
+                        <td>${u.name || 'User'}<br><small>${u.email}</small></td>
+                        <td><b>${u.inviteCount || 0}</b></td>
+                        <td>${u.deviceId ? u.deviceId.substring(0,8)+'...' : 'N/A'} ${isDeviceDup ? '<span class="tag tag-dup">DUP</span>' : ''}</td>
+                        <td>${u.ipAddress || 'N/A'} ${isIpDup ? '<span class="tag tag-dup">DUP</span>' : ''}</td>
+                    </tr>
+                `;
+                tbody.insertAdjacentHTML('beforeend', html);
+            });
+        }
+
+        // --- SECURE SAVE PROFILE ---
+        async function saveProfile() {
+            const btn = document.querySelector('#modal-profile .modal-btn');
+            const originalText = btn.innerText;
+            
+            try {
+                const dept = document.getElementById('dept-input').value.trim();
+                const gender = document.getElementById('gender-select').value;
+                const referInput = document.getElementById('refer-input').value.trim().toUpperCase();
+                
+                if(!dept || !gender) return showToast("Please fill all details");
+
+                btn.innerText = "Securing...";
+                btn.disabled = true;
+
+                let deviceId = localStorage.getItem('hush_device_id');
+                if (!deviceId) {
+                    deviceId = "DEV-" + Math.random().toString(36).substr(2, 9) + Date.now();
+                    localStorage.setItem('hush_device_id', deviceId);
+                }
+
+                let userIp = "Unknown";
+                try {
+                    const ipRes = await fetch('https://api.ipify.org?format=json');
+                    const ipData = await ipRes.json();
+                    userIp = ipData.ip;
+                } catch (e) { console.log("IP Fetch failed"); }
+
+                const baseName = currentUser.displayName ? currentUser.displayName.replace(/[^a-zA-Z]/g, "").substring(0,3).toUpperCase() : "USR";
+                const myCode = baseName + Math.floor(100 + Math.random() * 900);
+                const anonymousId = "User-" + Math.floor(1000 + Math.random() * 9000);
+
+                await db.collection('users').doc(currentUser.uid).set({
+                    email: currentUser.email, 
+                    name: currentUser.displayName,
+                    dept: dept, 
+                    gender: gender, 
+                    anonymousId: anonymousId, 
+                    myInviteCode: myCode, 
+                    inviteCount: 0, 
+                    joinedAt: new Date(),
+                    deviceId: deviceId,
+                    ipAddress: userIp
+                }, { merge: true });
+
+                if(referInput) {
+                    try {
+                        const snap = await db.collection('users').where('myInviteCode', '==', referInput).limit(1).get();
+                        if(!snap.empty) {
+                            const referrerData = snap.docs[0].data();
+                            if(referrerData.deviceId === deviceId) {
+                                showToast("🚫 Cheating Detected: Cannot refer yourself!");
+                            } else {
+                                await db.collection('users').doc(snap.docs[0].id).update({ 
+                                    inviteCount: firebase.firestore.FieldValue.increment(1) 
+                                });
+                            }
+                        }
+                    } catch (referErr) { console.log("Referral skip", referErr); }
+                }
+
+                userProfile = { dept, gender, anonymousId, myInviteCode: myCode, inviteCount: 0 };
+                document.getElementById('modal-profile').style.display = 'none';
+                document.getElementById('modal-rules').style.display = 'flex';
+                showToast("Profile Saved!");
+
+            } catch (e) {
+                alert("Error: " + e.message);
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // --- NAVIGATION ---
+        function openContest() {
+            hideAllViews();
+            document.getElementById('contest-view').style.display = 'block';
+            document.getElementById('channel-title').innerText = "Win ₹500";
+            document.getElementById('channel-title').style.display = 'block';
+            document.getElementById('back-btn').style.display = 'block';
+            document.getElementById('logo-text').style.display = 'none';
+            loadLeaderboard();
+            window.history.pushState({ page: 'contest' }, "Contest", "#contest");
+        }
+
+        function openDeals() {
+            hideAllViews();
+            document.getElementById('deals-view').style.display = 'block';
+            document.getElementById('channel-title').innerText = "Offers";
+            document.getElementById('channel-title').style.display = 'block';
+            document.getElementById('back-btn').style.display = 'block';
+            document.getElementById('logo-text').style.display = 'none';
+            window.history.pushState({ page: 'deals' }, "Deals", "#deals");
+        }
+
+                function enterChannel(channelKey, title) {
+            // 1. Clear previous views
+            hideAllViews();
+            currentTab = channelKey;
+            
+            // 2. Show the Feed & Filter Button
+            document.getElementById('feed-view').style.display = 'block';
+            document.getElementById('filter-btn').style.display = 'block'; 
+            
+            // 3. Update Header (Manually set to prevent errors)
+            document.getElementById('channel-title').innerText = title;
+            document.getElementById('channel-title').style.display = 'block';
+            document.getElementById('back-btn').style.display = 'block';
+            document.getElementById('logo-text').style.display = 'none';
+            
+            // 4. ADMIN LOGIC: Hide Chat Bar in News if not Admin
+            const chatBar = document.getElementById('chat-bar');
+            let isAdmin = false;
+            
+            // Safe check for Admin (won't crash if config is missing)
+            if (typeof ADMIN_EMAIL !== 'undefined' && currentUser && currentUser.email === ADMIN_EMAIL) {
+                isAdmin = true;
+            }
+
+            if (channelKey === 'news' && !isAdmin) {
+                chatBar.style.display = 'none'; // Hide input for students
+            } else {
+                chatBar.style.display = 'flex'; // Show input for others
+            }
+
+            // 5. Fix Back Button History
+            if (window.history && window.history.pushState) {
+                window.history.pushState({ page: 'channel' }, title, "#" + channelKey);
+            }
+
+            // 6. Start Loading Messages
+            loadFeed();
+            updateInputState();
+        }
+
+
+        function hideAllViews() {
+            document.getElementById('lobby-view').style.display = 'none';
+            document.getElementById('feed-view').style.display = 'none';
+            document.getElementById('contest-view').style.display = 'none';
+            document.getElementById('deals-view').style.display = 'none';
+            document.getElementById('admin-view').style.display = 'none';
+            document.getElementById('chat-bar').style.display = 'none';
+            document.getElementById('filter-btn').style.display = 'none';
+            if(feedListener) feedListener();
+        }
+
+        function goHome(isPop) {
+            if (!isPop && currentTab) {
+                history.back();
+                return; 
+            }
+            hideAllViews();
+            currentTab = null;
+            isTopFilter = false; 
+            updateFilterBtnUI();
+            document.getElementById('lobby-view').style.display = 'flex';
+            document.getElementById('logo-text').style.display = 'block';
+            document.getElementById('back-btn').style.display = 'none';
+            document.getElementById('channel-title').style.display = 'none';
+        }
+
+        window.addEventListener('popstate', (event) => { goHome(true); });
+
+        // --- FEED ---
+        function toggleTopFilter() {
+            isTopFilter = !isTopFilter;
+            updateFilterBtnUI();
+            loadFeed();
+        }
+
+        function updateFilterBtnUI() {
+            const btn = document.getElementById('filter-btn');
+            if(isTopFilter) {
+                btn.innerHTML = "🕒 Newest";
+                btn.classList.add('active');
+            } else {
+                btn.innerHTML = "❤️ Top";
+                btn.classList.remove('active');
+            }
+        }
+
+        function loadFeed() {
+            const feedDiv = document.getElementById('feed-content');
+            feedDiv.innerHTML = "";
+            document.getElementById('feed-loader').style.display = 'block';
+
+            let query = db.collection('messages').where('category', '==', currentTab);
+
+            if (isTopFilter) {
+                query = query.orderBy('upvotes', 'desc').limit(20);
+            } else {
+                query = query.orderBy('timestamp', 'desc').limit(30);
+            }
+
+            if(!isTopFilter) {
+                db.collection('messages')
+                    .where('category', '==', currentTab)
+                    .where('isPinned', '==', true)
+                    .onSnapshot(pinnedSnap => {
+                        document.querySelectorAll('.msg-card.pinned-card').forEach(e => e.remove());
+                        pinnedSnap.forEach(doc => renderMessage(doc.data(), doc.id, feedDiv));
+                    });
+            }
+
+            feedListener = query.onSnapshot(snap => {
+                document.getElementById('feed-loader').style.display = 'none';
+                document.querySelectorAll('.msg-card:not(.pinned-card)').forEach(e => e.remove());
+
+                if(snap.empty && document.querySelectorAll('.pinned-card').length === 0) {
+                     feedDiv.innerHTML += `<div id="no-msg" style="text-align:center;color:#94A3B8;margin-top:20px;">No messages yet.</div>`;
+                }
+                
+                // 1. Collect messages into an array
+                let allDocs = [];
+                snap.forEach(doc => allDocs.push(doc));
+
+                // 2. Reverse them ONLY for normal chat (Oldest -> Newest)
+                if(!isTopFilter) allDocs.reverse();
+
+                // 3. Render them
+                allDocs.forEach(doc => {
+                    if(!doc.data().isPinned || isTopFilter) {
+                        renderMessage(doc.data(), doc.id, feedDiv);
+                    }
+                });
+
+                // 4. Auto-scroll to bottom
+                if(!isTopFilter) {
+                    setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 100);
+                }
+            });
+
+
+        }
+
+        function scrollToMsg(id) {
+            const el = document.getElementById('msg-' + id);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('highlight-msg');
+                setTimeout(() => el.classList.remove('highlight-msg'), 2000);
+            } else {
+                showToast("Message not loaded nearby");
+            }
+        }
+
+        function renderMessage(msg, id, container) {
+            const isAdmin = typeof ADMIN_EMAIL !== 'undefined' && currentUser && currentUser.email === ADMIN_EMAIL;
+            const delBtn = isAdmin ? `<i class="fas fa-trash" onclick="deleteMsg('${id}')" style="color:#EF4444; cursor:pointer;"></i>` : '';
+            
+            const upvotes = msg.upvotes || 0;
+            const isUpvoted = currentUser && msg.upvotedBy && msg.upvotedBy.includes(currentUser.uid);
+            const heartIcon = isUpvoted ? "fas fa-heart" : "far fa-heart";
+            const heartClass = isUpvoted ? "upvoted" : "";
+
+            let replyHtml = "";
+            if (msg.replyToText) {
+                replyHtml = `<div class="reply-preview" onclick="scrollToMsg('${msg.replyToId}')">
+                    <b>${msg.replyToName}</b>: ${msg.replyToText}
+                </div>`;
+            }
+
+            let badges = "";
+            if(msg.isAdmin) badges += `<span class="badge badge-admin">ADMIN</span>`;
+            if(msg.isPremium) badges += `<span class="badge badge-gold">GOLD</span>`;
+            if(msg.isPinned) badges += `<span class="badge" style="background:#FDE047; color:#854D0E;">📌 PINNED</span>`;
+
+            let genderHtml = "";
+            if(!msg.isAdmin) {
+                if(msg.userGender === 'Male') genderHtml = `<span class="gender-box gender-m">M</span>`;
+                else if(msg.userGender === 'Female') genderHtml = `<span class="gender-box gender-f">F</span>`;
+                else genderHtml = `<span class="gender-box gender-h">?</span>`;
+            }
+
+            let timeStr = "Just now";
+            if(msg.timestamp) {
+                const date = msg.timestamp.toDate();
+                const datePart = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                const timePart = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                timeStr = `${datePart} • ${timePart}`;
+            }
+
+            const userMeta = msg.isAdmin ? "Announcement" : `${msg.userDept}`;
+            const displayId = msg.isAdmin ? "Admin" : (msg.anonymousId || "Anonymous");
+            const processedText = linkify(msg.text);
+
+            const html = `
+                <div class="msg-card ${msg.isPremium ? 'premium' : ''} ${currentTab === 'news' ? 'news-card' : ''} ${msg.isPinned ? 'pinned-card' : ''}" style="${msg.isPinned ? 'order:-1;' : ''}" id="msg-${id}">
+                    <div class="msg-header">
+                        <div style="flex-grow:1;">
+                            <div class="user-id">
+                                ${displayId} 
+                                ${genderHtml}
+                                <div class="badges">${badges}</div>
+                                <span class="msg-time">${timeStr}</span>
+                            </div>
+                            <div class="user-details">${userMeta}</div>
+                        </div>
+                        ${delBtn}
+                    </div>
+                    
+                    ${replyHtml}
+                    <div class="msg-text">${processedText}</div>
+
+                    <div class="msg-actions">
+                        <button class="action-btn" onclick="replyToMsg('${id}', '${escapeHtml(msg.text)}', '${msg.anonymousId}')">
+                            <i class="fas fa-reply"></i> Reply
+                        </button>
+                        <button class="action-btn ${heartClass}" onclick="toggleUpvote('${id}')">
+                            <i class="${heartIcon}"></i> ${upvotes}
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            if(msg.isPinned && !isTopFilter) {
+                container.insertAdjacentHTML('afterbegin', html);
+            } else {
+                container.insertAdjacentHTML('beforeend', html);
+            }
+        }
+
+        function toggleUpvote(id) {
+            if(!currentUser) return showToast("Login to vote!");
+            const docRef = db.collection('messages').doc(id);
+            
+            db.runTransaction(async (t) => {
+                const doc = await t.get(docRef);
+                if (!doc.exists) return;
+                const data = doc.data();
+                const uid = currentUser.uid;
+                
+                let upvotedBy = data.upvotedBy || [];
+                let upvotes = data.upvotes || 0;
+
+                if (upvotedBy.includes(uid)) {
+                    upvotedBy = upvotedBy.filter(u => u !== uid);
+                    upvotes--;
+                } else {
+                    upvotedBy.push(uid);
+                    upvotes++;
+                }
+                t.update(docRef, { upvotes, upvotedBy });
+            });
+        }
+
+        function replyToMsg(id, text, author) {
+            if(!currentUser) return showToast("Login to reply!");
+            replyData = { id, text: text.substring(0, 50) + "...", author };
+            document.getElementById('reply-context').style.display = 'flex';
+            document.getElementById('reply-to-name').innerText = author;
+            document.getElementById('chat-input').focus();
+        }
+
+        function cancelReply() {
+            replyData = null;
+            document.getElementById('reply-context').style.display = 'none';
+        }
+
+        function loadLeaderboard() {
+            const list = document.getElementById('leaderboard-list');
+            list.innerHTML = `<div style="padding:20px; text-align:center;">Loading...</div>`;
+            
+            db.collection('users')
+                .orderBy('inviteCount', 'desc')
+                .limit(5)
+                .get()
+                .then(snap => {
+                    list.innerHTML = "";
+                    let rank = 1;
+                    snap.forEach(doc => {
+                        const d = doc.data();
+                        const row = `
+                            <div class="rank-row">
+                                <div style="display:flex; gap:10px;">
+                                    <span class="rank-num rank-${rank}">#${rank}</span>
+                                    <span>${d.anonymousId || "User"}</span>
+                                </div>
+                                <div style="font-weight:bold; color:#10B981;">${d.inviteCount || 0} Invites</div>
+                            </div>
+                        `;
+                        list.insertAdjacentHTML('beforeend', row);
+                        rank++;
+                    });
+                });
+        }
+
+        function linkify(text) { return text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>'); }
+        function escapeHtml(text) { return text.replace(/'/g, "&apos;").replace(/"/g, "&quot;"); }
+        function showToast(msg) { const t = document.getElementById("toast"); t.innerText=msg; t.className="show"; setTimeout(()=>t.className="",3000); }
+        
+        function toggleNotifications() { 
+            if(!currentUser) return showToast("Login first");
+            if(isSubscribed) {
+                db.collection('users').doc(currentUser.uid).update({ fcmToken: firebase.firestore.FieldValue.delete() }).then(() => { isSubscribed=false; updateBellIcon(); showToast("Muted"); });
+            } else {
+                 Notification.requestPermission().then(p => { if(p==='granted') messaging.getToken({ vapidKey: "" }).then(t => { if(t) db.collection('users').doc(currentUser.uid).update({ fcmToken: t }); isSubscribed=true; updateBellIcon(); showToast("Subscribed!"); }); });
+            }
+        }
+        function updateBellIcon() {
+            const btn = document.getElementById('notif-btn');
+            if(btn) { btn.innerHTML = isSubscribed ? '<i class="fas fa-bell" style="color:#4F46E5;"></i>' : '<i class="fas fa-bell-slash" style="color:#94A3B8;"></i>'; }
+        }
+        
+        function deleteMsg(id) { if(confirm("Delete?")) db.collection('messages').doc(id).delete(); }
+        
+        function handleAuth() { currentUser ? auth.signOut() : document.getElementById('modal-login').style.display='flex'; }
+        function googleLogin() { auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
+        function acceptRules() { sessionStorage.setItem('rulesAgreed', 'true'); document.getElementById('modal-rules').style.display='none'; }
+        
+        function toggleGold() { isGold = !isGold; document.getElementById('gold-btn').classList.toggle('active', isGold); showToast(isGold?"Gold Mode ON":"OFF"); }
+        function donateMoney() { startPayment(50, () => showToast("Thanks! ❤️")); }
+        
+        function startPayment(amt, cb) {
+            if (typeof Razorpay === 'undefined') return showToast("Loading...");
+            new Razorpay({ "key": RAZORPAY_KEY, "amount": amt*100, "currency": "INR", "name": "Campus Hush", "handler": cb, "theme": {"color": "#0F172A"} }).open();
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if(!text) return;
+            if(!currentUser) return showToast("Please Login!");
+
+            const badWords = ["fuck", "punda", "otha", "dick", "bitch", "koothi", "mairu", "soothu", "oombu", "pundai", "poolu", "sunni"];
+            if(badWords.some(w => text.toLowerCase().includes(w))) return showToast("🚫 Bad Language!");
+
+            if(!userProfile) { document.getElementById('modal-profile').style.display='flex'; return; }
+
+            const payload = {
+                text: text, category: currentTab, isPremium: isGold,
+                isAdmin: typeof ADMIN_EMAIL !== 'undefined' && currentUser.email === ADMIN_EMAIL, 
+                userDept: userProfile.dept, userGender: userProfile.gender,
+                anonymousId: userProfile.anonymousId, senderUid: currentUser.uid,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                upvotes: 0, upvotedBy: [], isPinned: false
+            };
+
+            if (replyData) {
+                payload.replyToId = replyData.id;
+                payload.replyToName = replyData.author;
+                payload.replyToText = replyData.text;
+                cancelReply();
+            }
+
+            if(isGold) {
+                startPayment(10, () => { db.collection('messages').add(payload); input.value = ""; toggleGold(); });
+            } else {
+                db.collection('messages').add(payload); input.value = "";
+            }
+        }
+
+        function shareReferral() {
+            if(!userProfile) return showToast("Login first");
+            const text = `Join Campus Hush with code *${userProfile.myInviteCode}* and win cash! https://hushly.fun`;
+            window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+        }
+
+        let deferredPrompt;
+        const installContainer = document.getElementById('install-container');
+        window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; installContainer.style.display = 'flex'; });
+        async function installApp() { if (!deferredPrompt) return; deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice; if(outcome === 'accepted') installContainer.style.display = 'none'; deferredPrompt = null; }
+        window.addEventListener('appinstalled', () => { installContainer.style.display = 'none'; deferredPrompt = null; });
+        /*making this project 1100 lines of code by typing comment lol 
+        */
+    </script>
+</body>
+</html>
