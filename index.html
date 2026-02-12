@@ -884,9 +884,11 @@
             }
         }
 
-        function loadFeed() {
+               function loadFeed() {
+            // 1. STOP PREVIOUS LISTENER (Fixes the 0->1->0 flickering)
+            if (feedListener) feedListener();
+
             const feedDiv = document.getElementById('feed-content');
-            feedDiv.innerHTML = "";
             document.getElementById('feed-loader').style.display = 'block';
 
             let query = db.collection('messages').where('category', '==', currentTab);
@@ -897,6 +899,7 @@
                 query = query.orderBy('timestamp', 'desc').limit(30);
             }
 
+            // Handle Pinned Messages (unchanged)
             if(!isTopFilter) {
                 db.collection('messages')
                     .where('category', '==', currentTab)
@@ -907,36 +910,73 @@
                     });
             }
 
+            // Main Feed Listener
             feedListener = query.onSnapshot(snap => {
                 document.getElementById('feed-loader').style.display = 'none';
+
+                // --- SMART UPDATE CHECK ---
+                // If the only changes are "modified" (likes), we DO NOT reload the whole list.
+                // We just update the numbers in place.
+                const isJustUpdates = !snap.empty && snap.docChanges().every(c => c.type === 'modified');
+
+                if (isJustUpdates) {
+                    snap.docChanges().forEach(change => {
+                        if (change.type === 'modified') {
+                            const data = change.doc.data();
+                            const id = change.doc.id;
+                            const card = document.getElementById('msg-' + id);
+                            
+                            // Update only the heart button inside the existing card
+                            if (card) {
+                                const btn = card.querySelectorAll('.action-btn')[1]; // 2nd button is the Like button
+                                if(btn) {
+                                    const isUpvoted = currentUser && data.upvotedBy && data.upvotedBy.includes(currentUser.uid);
+                                    const heartIcon = isUpvoted ? "fas fa-heart" : "far fa-heart";
+                                    const heartClass = isUpvoted ? "upvoted" : "";
+                                    
+                                    // Soft update (no flicker)
+                                    btn.className = `action-btn ${heartClass}`;
+                                    btn.innerHTML = `<i class="${heartIcon}"></i> ${data.upvotes || 0}`;
+                                }
+                            }
+                        }
+                    });
+                    return; // STOP HERE! Don't run the code below (prevents scrolling/re-render)
+                }
+
+                // --- NORMAL LOAD (New messages or First load) ---
+                
+                // 1. Check if we should scroll (Only for NEW items)
+                let shouldScroll = false;
+                snap.docChanges().forEach(change => {
+                    if (change.type === "added") shouldScroll = true;
+                });
+
+                // 2. Render List
                 document.querySelectorAll('.msg-card:not(.pinned-card)').forEach(e => e.remove());
 
                 if(snap.empty && document.querySelectorAll('.pinned-card').length === 0) {
                      feedDiv.innerHTML += `<div id="no-msg" style="text-align:center;color:#94A3B8;margin-top:20px;">No messages yet.</div>`;
                 }
                 
-                // 1. Collect messages into an array
                 let allDocs = [];
                 snap.forEach(doc => allDocs.push(doc));
 
-                // 2. Reverse them ONLY for normal chat (Oldest -> Newest)
                 if(!isTopFilter) allDocs.reverse();
 
-                // 3. Render them
                 allDocs.forEach(doc => {
                     if(!doc.data().isPinned || isTopFilter) {
                         renderMessage(doc.data(), doc.id, feedDiv);
                     }
                 });
 
-                // 4. Auto-scroll to bottom
-                if(!isTopFilter) {
+                // 3. Scroll only if a NEW message arrived
+                if(!isTopFilter && shouldScroll) {
                     setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 100);
                 }
             });
-
-
         }
+
 
         function scrollToMsg(id) {
             const el = document.getElementById('msg-' + id);
