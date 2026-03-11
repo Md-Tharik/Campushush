@@ -309,7 +309,8 @@ function loadFeed() {
     let query = db.collection('messages').where('category', '==', currentTab);
 
     if (isTopFilter) {
-        query = query.orderBy('upvotes', 'desc').limit(50);
+        // Client-side sort — avoids needing a Firestore composite index
+        query = query.orderBy('timestamp', 'asc').limitToLast(200);
     } else {
         query = query.orderBy('timestamp', 'asc').limitToLast(100);
     }
@@ -319,6 +320,7 @@ function loadFeed() {
 
         // Smart update: only likes changed — update in place, no re-render
         const isJustUpdates = !snap.empty && snap.docChanges().every(c => c.type === 'modified');
+
 
         if (isJustUpdates) {
             snap.docChanges().forEach(change => {
@@ -350,7 +352,11 @@ function loadFeed() {
 
         let allDocs = [];
         snap.forEach(doc => allDocs.push(doc));
-        if (!isTopFilter) allDocs.reverse();
+
+        // Top filter: sort by upvotes descending in JS — no Firestore index needed
+        if (isTopFilter) {
+            allDocs.sort((a, b) => (b.data().upvotes || 0) - (a.data().upvotes || 0));
+        }
 
         allDocs.forEach(doc => {
             if (!doc.data().isPinned || isTopFilter) {
