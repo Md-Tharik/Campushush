@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hushly — Speak Freely</title>
+
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="apple-touch-icon" href="logo.png">
+    <link rel="manifest" href="manifest.json">
+
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-messaging-compat.js"></script>
+</head>
+<body>
+
+    <!-- ========== HEADER ========== -->
+    <header class="app-header">
+        <div class="header-left">
+            <div class="back-btn" id="back-btn" onclick="goHome()">
+                <i class="fas fa-arrow-left"></i>
+            </div>
+            <div class="logo" id="logo-text">Hushly 🤫</div>
+            <div class="channel-title" id="channel-title">Channel</div>
+        </div>
+        <div class="header-right">
+            <button class="btn-sm btn-admin" id="admin-btn" onclick="openAdminPanel()">📊 Dashboard</button>
+            <button class="btn-sm btn-filter" id="filter-btn" onclick="toggleTopFilter()">🔥 top</button>
+            <button class="btn-sm btn-support" onclick="donateMoney()">❤️ Support</button>
+            <button class="btn-sm btn-login" id="auth-btn" onclick="handleAuth()">Login</button>
+        </div>
+    </header>
+
+    <!-- ========== LOBBY ========== -->
+    <div class="lobby-container" id="lobby-view">
+
+        <div id="install-container">
+            <button onclick="installApp()" class="btn-install">
+                <i class="fas fa-download" style="color:#818CF8;"></i> Install App
+            </button>
+        </div>
+
+        <!-- User Identity Card -->
+        <div id="my-profile-card" class="profile-card">
+            <div class="profile-avatar">👤</div>
+            <div>
+                <div class="profile-label">YOUR ANONYMOUS IDENTITY</div>
+                <div id="my-anon-id" class="profile-name">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Chat Zones -->
+        <div class="section-header">💬 Chat Zones</div>
+
+        <div class="channel-block c-chat" onclick="enterChannel('chitchat', '💬 Chit Chat')">
+            <div class="block-icon"><i class="fas fa-comments"></i></div>
+            <div class="block-info">
+                <h3>Chit Chat</h3>
+                <p>Casual talks, confessions &amp; fun.</p>
+            </div>
+            <i class="fas fa-chevron-right" style="margin-left:auto; color:#CBD5E1;"></i>
+        </div>
+
+        <div class="channel-block c-rant" onclick="enterChannel('rant', '🗣️ Just Rant')">
+            <div class="block-icon"><i class="fas fa-fire"></i></div>
+            <div class="block-info">
+                <h3>Just Rant</h3>
+                <p>Vent freely, no filters, no judgement.</p>
+            </div>
+            <i class="fas fa-chevron-right" style="margin-left:auto; color:#CBD5E1;"></i>
+        </div>
+
+        <div class="channel-block c-news" onclick="enterChannel('news', '📢 Important News')">
+            <div class="block-icon"><i class="fas fa-bullhorn"></i></div>
+            <div class="block-info">
+                <h3>Important News</h3>
+                <p>Official updates (Admin only).</p>
+            </div>
+            <i class="fas fa-chevron-right" style="margin-left:auto; color:#CBD5E1;"></i>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer-container">
+            <div class="dev-credit">
+                &copy; 2026 Hushly. Built by
+                <a href="https://instagram.com/tharik563" target="_blank">Md Tharik</a>
+            </div>
+            <div class="legal-links">
+                <a href="legal.html">Privacy</a> •
+                <a href="legal.html">Terms</a> •
+                <a href="legal.html">Contact</a> •
+                <a href="legal.html">Refund</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== FEED VIEW ========== -->
+    <div class="feed-container" id="feed-view">
+        <div id="feed-loader" style="text-align:center; padding:50px; color:#94A3B8;">Loading...</div>
+        <div id="feed-content" style="display:flex; flex-direction:column;"></div>
+    </div>
+
+    <!-- ========== ADMIN VIEW ========== -->
+    <div class="admin-view" id="admin-view">
+        <h2 style="color:#1E293B;">👥 User Overview</h2>
+        <p style="color:#64748B;">Red rows = same device or IP. Green rows = unique users.</p>
+        <button class="btn-sm" style="margin-bottom:15px;" onclick="loadAdminData()">🔄 Refresh</button>
+
+        <div class="admin-stats-card">
+            👥 Total Users: <span id="total-users-count" style="color:#4F46E5; font-size:1.2rem;">—</span>
+        </div>
+
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Invites</th>
+                    <th>Device ID</th>
+                    <th>IP Address</th>
+                </tr>
+            </thead>
+            <tbody id="admin-table-body">
+                <tr><td colspan="4" style="text-align:center;">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ========== CHAT BAR ========== -->
+    <div class="chat-bar" id="chat-bar">
+        <div id="reply-context">
+            <span>Replying to <b id="reply-to-name">User</b></span>
+            <i class="fas fa-times" onclick="cancelReply()" style="cursor:pointer; padding:5px;"></i>
+        </div>
+        <div class="input-row">
+            <div class="input-wrapper">
+                <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off">
+                <button id="gold-btn" class="btn-gold" onclick="toggleGold()">
+                    <i class="fas fa-crown"></i>
+                </button>
+            </div>
+            <button class="send-btn" onclick="sendMessage()">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- ========== MODALS ========== -->
+
+    <!-- Login Modal -->
+    <div id="modal-login" class="modal-overlay">
+        <div class="modal">
+            <h2>Welcome to Hushly</h2>
+            <p style="color:#64748B; margin-bottom:20px;">Login to join the conversation.</p>
+            <button class="modal-btn" onclick="googleLogin()">
+                <i class="fab fa-google" style="margin-right:8px;"></i>Login with Google
+            </button>
+            <button class="modal-btn modal-btn-ghost" onclick="document.getElementById('modal-login').style.display='none'">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Profile Setup Modal -->
+    <div id="modal-profile" class="modal-overlay">
+        <div class="modal">
+            <h2>Setup Your Profile</h2>
+            <p style="color:#64748B; font-size:0.9rem; margin-bottom:20px;">Required to keep the community safe.</p>
+            <input type="text" id="dept-input" placeholder="Your city or community (e.g. Mumbai, Tech)" maxlength="30">
+            <select id="gender-select">
+                <option value="" disabled selected>Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Hidden">Prefer not to say</option>
+            </select>
+            <div style="margin:10px 0; text-align:left;">
+                <label style="font-size:0.8rem; font-weight:bold; color:#64748B;">Referral Code (Optional):</label>
+                <input type="text" id="refer-input" placeholder="Enter a friend's code" style="text-transform:uppercase; margin-top:6px;">
+            </div>
+            <button class="modal-btn" onclick="saveProfile()">Save &amp; Continue</button>
+        </div>
+    </div>
+
+    <!-- Community Rules Modal -->
+    <div id="modal-rules" class="modal-overlay">
+        <div class="modal">
+            <h2 style="color:#DC2626;">⚠️ Community Rules</h2>
+            <ul style="text-align:left; color:#475569; margin:20px 0; padding-left:20px; line-height:1.8;">
+                <li>🚫 No abusive language.</li>
+                <li>🔞 No NSFW content.</li>
+                <li>🤝 Respect everyone.</li>
+            </ul>
+            <p style="font-size:0.85rem; margin-bottom:20px;">By clicking agree, you accept these terms.</p>
+            <button class="modal-btn modal-btn-red" onclick="acceptRules()">I Agree &amp; Understand</button>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast"></div>
+
+    <!-- Scripts -->
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
